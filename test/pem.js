@@ -155,7 +155,7 @@ module.exports = {
     const der = pems[0].readDER();
 
     instanceOf(der, Chunk, 'DER Chunk was not created');
-    equals(der.raw.toString('hex'), pems[0].data.toString('hex'), 'DER raw format doesn\'t match PEM data');
+    equals(der.getRaw().toString('hex'), pems[0].data.toString('hex'), 'DER raw format doesn\'t match PEM data');
 
     resolve();
   }

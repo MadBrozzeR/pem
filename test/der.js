@@ -2,9 +2,10 @@ const { Chunk } = require('../src/der/der.js');
 const { OID } = require('../src/oid/oid.js');
 
 function chunkCheck (suit, chunk, params) {
+  const info = chunk.getInfo();
   const prefix = params.prefix || '';
   (params.type !== undefined) && suit.equals(chunk.type, params.type, prefix + 'Wrong type detection');
-  (params.length !== undefined) && suit.equals(chunk.length.value, params.length, prefix + 'Wrong length detected');
+  (params.length !== undefined) && suit.equals(info.length, params.length, prefix + 'Wrong length detected');
   (params.instanceOf !== undefined) && suit.instanceOf(chunk.data, params.instanceOf, prefix + 'Wrong data instance');
   (params.value !== undefined) && suit.equals(
     chunk.data instanceof Buffer ? chunk.data.toString('hex') : chunk.data,
@@ -74,7 +75,7 @@ module.exports = {
     resolve();
   },
   'Correctly parses sequences and sets': function (resolve) {
-    const data = '301a' +
+    const data = '3019' +
       '3006' +
         '020100' +
         '020101' +
@@ -89,7 +90,7 @@ module.exports = {
 
     chunkCheck(this, chunk, {
       type: 0x30,
-      length: 0x1a,
+      length: 0x19,
       instanceOf: Array,
       raw: data,
       prefix: '[SEQ-301a] '
@@ -132,7 +133,7 @@ module.exports = {
   },
 
   'Correctly serializes to HEX': function (resolve) {
-    const data = '301a' +
+    const data = '3019' +
       '3006' +
         '020100' +
         '020101' +
@@ -148,22 +149,22 @@ module.exports = {
 
     this.equals(
       chunk.toHEX(),
-      '30 1a 30 06 02 01 00 02 01 01 30 0f 31 03 02 01\n10 31 03 02 01 11 31 03 02 01 12',
+      '30 19 30 06 02 01 00 02 01 01 30 0f 31 03 02 01\n10 31 03 02 01 11 31 03 02 01 12',
       'Wrong serialization with default parameters'
     );
     this.equals(
       chunk.toHEX({ width: 0 }),
-      '30 1a 30 06 02 01 00 02 01 01 30 0f 31 03 02 01 10 31 03 02 01 11 31 03 02 01 12',
+      '30 19 30 06 02 01 00 02 01 01 30 0f 31 03 02 01 10 31 03 02 01 11 31 03 02 01 12',
       'Wrong one-line serialization'
     );
     this.equals(
       chunk.toHEX({ width: 8 }),
-      '30 1a 30 06 02 01 00 02\n01 01 30 0f 31 03 02 01\n10 31 03 02 01 11 31 03\n02 01 12',
+      '30 19 30 06 02 01 00 02\n01 01 30 0f 31 03 02 01\n10 31 03 02 01 11 31 03\n02 01 12',
       'Wrong serialization with width specified'
     );
     this.equals(
       chunk.toHEX({ length: 18 }),
-      '30 1a 30 06 02 01 00 02 01 01 30 0f 31 03 02 01\n10 31 ...',
+      '30 19 30 06 02 01 00 02 01 01 30 0f 31 03 02 01\n10 31 ...',
       'Wrong serialization with length specified'
     );
 

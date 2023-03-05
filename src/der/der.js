@@ -1,23 +1,24 @@
-const { Reader } = require('mbr-buffer');
 const { HEX } = require('../common/utils.js');
-const { TYPE_CONST } = require('./constants.js');
-const { debugType, debugData, parseData, readLength } = require('./utils.js');
+const { TYPES, TYPE_CONST } = require('./constants.js');
+const { OID } = require('../oid/oid.js');
+const {
+  readOID,
+  parseOID,
+  getDataLength,
+  // debugType,
+  debugData,
+  readChunkInfo,
+  getBufferFromNumber,
+} = require('./utils.js');
 
-function Chunk (reader, parent = null) {
-  const start = reader.index;
-  const typeByte = reader.readUIntBE(1);
-  const length = readLength(reader);
-  const end = reader.index + length.value;
+function Chunk (type, data) {
+  this.type = type & 0b00111111;
+  this.typeClass = type & 0b11000000;
+  this.data = null;
 
-  this.typeByte = typeByte;
-  this.length = length;
-  this.type = typeByte & 0b00111111;
-  this.typeClass = typeByte & 0b11000000;
-  this.rawData = length.value ? reader.slice(length.value) : Buffer.alloc(0);
-  this.raw = reader.buffer.slice(start, end);
-  this.parent = parent;
-
-  this.data = parseData(this);
+  if (data !== undefined) {
+    this.set(data);
+  }
 }
 /*
 Chunk.prototype.toJSON = function () {
@@ -30,20 +31,172 @@ Chunk.prototype.toJSON = function () {
 }
 */
 Chunk.prototype.toHEX = function (params) {
-  return HEX(this.raw, params);
+  return HEX(this.getRaw(), params);
 }
 Chunk.prototype.debug = function (spacer = '') {
-  return spacer + HEX(Buffer.from([this.typeByte])) +
-    ' ' + HEX(this.length.raw) +
-    ' (' + (TYPE_CONST[this.type] || '[???]') +
-    ': ' + this.length.value + ')\n' +
+  const info = this.getInfo();
+  const header = this.raw.slice(0, info.header);
+
+  return spacer + HEX(header, { width: 0 }) +
+    ' (' + (TYPE_CONST[info.type] || '[???]') +
+    ': ' + info.length + ')\n' +
     debugData(this.data, this, spacer + '  ');
 }
 Chunk.prototype.readAsChunk = function () {
   return Chunk.read(this.data);
 }
 Chunk.read = function (buffer) {
-  return new Chunk(new Reader(buffer));
+  const info = readChunkInfo(buffer);
+  const chunk = new Chunk(info.type).setRawData(info.data);
+
+  if (!chunk.validate(buffer)) {
+    throw new Error(
+      'Validation failed. Raw data mismatch.\n' +
+        'RAW: ' + chunk.raw.toString('hex') + '\n' +
+        'VAL: ' + buffer.toString('hex')
+    );
+  }
+
+  return chunk;
 }
+Chunk.prototype.validate = function (buffer) {
+  return this.raw.equals(buffer);
+}
+Chunk.prototype.parseData = function (buffer) {
+  switch (this.type) {
+    case TYPES.INTEGER:
+      if (buffer === 7 && buffer[0] === 0) {
+        return buffer.readUIntBE(1, 6);
+      }
+      if (buffer.length > 6) {
+        return buffer;
+      }
+      return buffer.readIntBE(0, buffer.length);
+
+    case TYPES.NULL:
+      return null;
+
+    case TYPES.SEQUENCE:
+    case TYPES.SET:
+      const result = [];
+
+      for (let index = 0 ; index < buffer.length ; ) {
+        const chunkInfo = readChunkInfo(buffer, index);
+        result.push(
+          new Chunk(chunkInfo.type)
+            .setRawData(chunkInfo.data)
+        );
+        index += chunkInfo.total;
+      }
+
+      return result;
+
+    case TYPES.IA5:
+    case TYPES.T61:
+    case TYPES.UTF8:
+      return buffer.toString('utf8');
+
+    case TYPES.OBJECT:
+      return readOID(buffer);
+
+    case TYPES.BIT:
+      return buffer.slice(1);
+
+    default:
+      return buffer;
+  }
+}
+Chunk.prototype.serialize = function (data) {
+  switch (this.type) {
+    case TYPES.INTEGER:
+      if (data instanceof Buffer) {
+        return data;
+      }
+
+      if (data.constructor !== Number) {
+        throw 'Wrong data type for INTEGER type';
+      }
+
+      return getBufferFromNumber(data);
+
+    case TYPES.NULL:
+      return Buffer.alloc(0);
+
+    case TYPES.BIT:
+      if (!(data instanceof Buffer)) {
+        throw new Error('Wrong data type. Buffer is required');
+      }
+
+      return Buffer.concat([
+        Buffer.from([0]),
+        data
+      ], data.length + 1);
+
+    case TYPES.OBJECT:
+      if (!(data instanceof OID)) {
+        throw new Error('Wrong data type. OID instance is required.')
+      }
+
+      return parseOID(data.id);
+
+    case TYPES.PRINTABLE:
+    case TYPES.UTF8:
+      if (typeof data !== 'string') {
+        throw new Error('Wrong data type. String is required');
+      }
+
+      return Buffer.from(data, 'utf8');
+
+    case TYPES.SET:
+    case TYPES.SEQUENCE:
+      if (!(data instanceof Array)) {
+        throw new Error('Wrong data type. Array of Chunk is required');
+      }
+
+      const result = [];
+      let length = 0;
+
+      for (let index = 0 ; index < data.length ; ++index) {
+        if (data[index] instanceof Chunk) {
+          const item = data[index].raw;
+          length += item.length;
+          result.push(item);
+        }
+      }
+
+      return Buffer.concat(result, length);
+
+    default:
+      if (data instanceof Buffer) {
+        return data;
+      }
+  }
+}
+Chunk.prototype.set = function (data) {
+  this.data = data;
+  this.raw = this.getRaw();
+
+  return this;
+}
+Chunk.prototype.setRawData = function (buffer) {
+  this.data = this.parseData(buffer);
+  this.raw = this.getRaw();
+
+  return this;
+}
+Chunk.prototype.getRaw = function () {
+  const data = this.serialize(this.data);
+  const length = getDataLength(data);
+
+  return Buffer.concat([
+    Buffer.from([this.type | this.typeClass]),
+    length.raw,
+    data
+  ], length.value + length.raw.length + 1);
+}
+Chunk.prototype.getInfo = function () {
+  return readChunkInfo(this.raw);
+}
+Chunk.TYPES = TYPES;
 
 module.exports = { Chunk };

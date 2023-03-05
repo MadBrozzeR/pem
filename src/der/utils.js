@@ -1,14 +1,16 @@
-const { Reader } = require('mbr-buffer');
 const { HEX } = require("../common/utils.js");
 const { OID } = require('../oid/oid.js');
 const { TYPES, TYPE_CONST } = require('./constants.js');
 
+// DEPRECATED
+/*
 function debugType (chunk) {
   return '[' +
     chunk.typeByte.toString(16) +
     '] ' +
     TYPE_CONST[chunk.type];
 }
+*/
 
 function debugData (data, chunk, spacer = '') {
   const Chunk = chunk.constructor;
@@ -31,31 +33,33 @@ function debugData (data, chunk, spacer = '') {
     return data.debug(spacer);
   }
 
+  const info = chunk.getInfo();
+
   if (data instanceof Buffer) {
-    return chunk.rawData.length
-      ? spacer + HEX(chunk.rawData, { length: 32, width: 0 }) + '\n'
+    return info.length
+      ? spacer + HEX(info.data, { length: 32, width: 0 }) + '\n'
       : '';
   }
 
   if (data instanceof OID) {
-    return spacer + HEX(chunk.rawData, { length: 32, width: 0}) +
+    return spacer + HEX(info.data, { length: 32, width: 0}) +
       ' (' + data.toString() + ')\n';
   }
 
-  return spacer + HEX(chunk.rawData, { length: 32, width: 0 }) +
+  return spacer + HEX(info.data, { length: 32, width: 0 }) +
     ' (' + data + ')\n';
 }
 
-function readOID (reader) {
+function readOID (buffer) {
   let result = '';
 
-  const first = reader.readUIntBE(1);
+  const first = buffer.readUInt8(0);
   result += Math.floor(first / 40);
   result += '.' + first % 40;
   let big = 0;
 
-  while (!reader.isEndReached()) {
-    const byte = reader.readUIntBE(1);
+  for (let index = 1 ; index < buffer.length ; ++index) {
+    const byte = buffer.readUInt8(index);
 
     if (byte & 0x80) {
       big = (big | (byte & 0x7f)) << 7
@@ -108,69 +112,30 @@ function parseOID (oid) {
   return Buffer.from(bytes);
 }
 
-function parseData (chunk) {
-  const Chunk = chunk.constructor;
-
-  const reader = new Reader(chunk.rawData);
-  const length = chunk.length.value;
-
-  switch (chunk.type) {
-    case TYPES.INTEGER:
-      if (length > 8) {
-        return chunk.rawData;
-      }
-
-      return reader.readIntBE(length);
-
-    case TYPES.NULL:
-      return null;
-
-    case TYPES.SEQUENCE:
-    case TYPES.SET:
-      const result = [];
-
-      while (!reader.isEndReached()) {
-        result.push(new Chunk(reader, chunk));
-      }
-
-      return result;
-
-    case TYPES.IA5:
-    case TYPES.T61:
-    case TYPES.UTF8:
-      return reader.read(length);
-
-    case TYPES.OBJECT:
-      return readOID(reader);
-
-    case TYPES.BIT:
-      return chunk.rawData.slice(1);
-
-    default:
-      return chunk.rawData;
-  }
-}
-
-function readLength (reader) {
-  const first = reader.readUIntBE(1);
-
-  if (first & 0x80) {
-    const length = first & 0x7f;
-
-    if (length > 8) {
-      throw new Error('Data length > 8 bytes is not supported yet. Given length is ' + length + ' bytes');
-    }
-
-    return {
-      raw: reader.buffer.slice(reader.index - 1, reader.index + length),
-      value: reader.readUIntBE(length),
-    }
-  }
-
-  return {
-    raw: reader.buffer.slice(reader.index - 1, reader.index),
-    value: first
+function readChunkInfo (buffer, index = 0) {
+  const result = {
+    type: buffer[index + 0],
+    length: buffer[index + 1],
+    header: 2,
+    total: 2,
+    data: null,
   };
+
+  if (result.length & 0x80) {
+    const extraBytes = result.length & 0x7f;
+
+    if (extraBytes > 6) {
+      throw new Error('Data length > 6 bytes is not supported yet. Given length is ' + extraBytes);
+    }
+
+    result.length = buffer.readUIntBE(index + 2, extraBytes);
+    result.header += extraBytes;
+  }
+
+  result.total = result.header + result.length;
+  result.data = buffer.slice(index + result.header, index + result.total);
+
+  return result;
 }
 
 function getBufferFromNumber (number, { ignoreLeadingZero = false } = {}) {
@@ -180,6 +145,10 @@ function getBufferFromNumber (number, { ignoreLeadingZero = false } = {}) {
 
   if (isNegative) {
     throw new Error('Negative numbers are not supported yet');
+  }
+
+  if (number === 0) {
+    return Buffer.alloc(1);
   }
 
   for (let index = 0 ; index < buffer.length ; ++index) {
@@ -195,7 +164,7 @@ function getBufferFromNumber (number, { ignoreLeadingZero = false } = {}) {
   }
 }
 
-function getLength (data) {
+function getDataLength (data) {
   const value = data.length;
   const result = [];
 
@@ -218,11 +187,11 @@ function getLength (data) {
 }
 
 module.exports = {
-  debugType,
+  // debugType,
   debugData,
-  parseData,
-  getLength,
-  readLength,
+  getDataLength,
+  readChunkInfo,
   getBufferFromNumber,
   parseOID,
+  readOID,
 };
