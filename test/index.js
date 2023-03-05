@@ -2,8 +2,21 @@ const PEM = require('./pem.js');
 const DER = require('./der.js');
 const writeDER = require('./write-der.js');
 
+function setColor (color) {
+  return function (data) {
+    return '\033[' + color + 'm' + data + '\033[0m'
+  }
+}
+
+const COLOR = {
+  RED: setColor(31),
+  GREEN: setColor(32),
+  YELLOW: setColor(33),
+  BLUE: setColor('34;1'),
+}
+
 function logExpectations (message, expected, received) {
-  return message + '\n  EXPECTED:\n    ' + expected + '\n  RECEIVED:\n    ' + received;
+  return message + '\n    EXPECTED:\n      ' + COLOR.GREEN(expected) + '\n    RECEIVED:\n      ' + COLOR.RED(received);
 }
 
 const testSuit = {
@@ -56,24 +69,31 @@ const testSuit = {
 function out(data) {
   process.stdout.write(data);
 }
-function testAll() {
+function testAll(groups) {
   let tests = Promise.resolve();
   let success = true;
 
-  for (let index = 0 ; index < arguments.length ; ++index) {
-    const test = arguments[index];
+  for (const group in groups) {
+    const test = groups[group];
+    tests.then(function () {
+      out(COLOR.BLUE(group) + (test.skip ? COLOR.YELLOW(' [SKIPPED]') : '') + '\n');
+    });
 
-    for (const description in test) {
+    if (!test.skip) for (const description in test) {
+      if (description === 'skip') {
+        continue;
+      }
+
       tests = tests.then(function () {
-        out(description + ': ');
+        out('  ' + description + ': ');
 
         return new Promise(test[description].bind(testSuit))
           .then(function () {
-            out('DONE\n');
+            out(COLOR.GREEN('DONE\n'));
           })
           .catch(function (error) {
-            out('FAILED\n');
-            out('REASON: ' + (error instanceof Error ? error.message : error) + '\n');
+            out(COLOR.RED('FAILED\n'));
+            out('  REASON: ' + (error instanceof Error ? error.message : error) + '\n');
             success = false;
 
             if (error instanceof Error) {
@@ -86,11 +106,11 @@ function testAll() {
 
   tests.then(function () {
     if (success) {
-      out('All tests successfully passed\n');
+      out(COLOR.GREEN('All tests successfully passed\n'));
     } else {
-      out('Some test failed\n')
+      out(COLOR.RED('Some test failed\n'));
     }
   });
 }
 
-testAll(PEM, DER, writeDER);
+testAll({ 'PEM Module': PEM, 'DER Parser': DER, 'DER Generator': writeDER });

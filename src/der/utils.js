@@ -1,6 +1,7 @@
 const { HEX } = require("../common/utils.js");
 const { OID } = require('../oid/oid.js');
 const { TYPES, TYPE_CONST } = require('./constants.js');
+const { Stack } = require('../common/stack.js');
 
 // DEPRECATED
 /*
@@ -90,12 +91,13 @@ function parseOID (oid) {
     if (current < 128) {
       bytes.push(current);
     } else {
-      const stack = [];
+      const stack = new Stack();
+      let value;
 
       while (current > 0) {
-        let value = current & 0x7f;
+        value = current & 0x7f;
 
-        if (stack.length) {
+        if (stack.top !== Stack.Null) {
           value = value | 0x80;
         }
 
@@ -103,8 +105,8 @@ function parseOID (oid) {
         current = current >> 7;
       }
 
-      for (let stackIndex = stack.length - 1 ; stackIndex >= 0 ; --stackIndex) {
-        bytes.push(stack[stackIndex]);
+      while ((value = stack.pop()) !== Stack.Null) {
+        bytes.push(value);
       }
     }
   }

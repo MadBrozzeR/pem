@@ -1,0 +1,31 @@
+{
+  "name": "mbr-pem",
+  "version": "0.0.1",
+  "description": "PEM data manipulation",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node test/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MadBrozzeR/pem.git"
+  },
+  "keywords": [
+    "pem",
+    "der",
+    "private key",
+    "public key",
+    "certificate",
+    "asn.1",
+    "csr"
+  ],
+  "author": "MadBrozzeR",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MadBrozzeR/pem/issues"
+  },
+  "homepage": "https://github.com/MadBrozzeR/pem#readme"
+}

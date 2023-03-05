@@ -55,5 +55,7 @@ module.exports = {
         new Chunk(Chunk.TYPES.UTF8, 'text')
       ])
     ]), { raw: '300d310302010c31060c0474657874' });
+
+    resolve();
   }
 };

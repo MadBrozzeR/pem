@@ -12,8 +12,9 @@ const {
 } = require('./utils.js');
 
 function Chunk (type, data) {
-  this.type = type & 0b00111111;
-  this.typeClass = type & 0b11000000;
+  // this.type = type & 0b00111111;
+  // this.typeClass = type & 0b11000000;
+  this.type = type;
   this.data = null;
 
   if (data !== undefined) {
@@ -38,7 +39,7 @@ Chunk.prototype.debug = function (spacer = '') {
   const header = this.raw.slice(0, info.header);
 
   return spacer + HEX(header, { width: 0 }) +
-    ' (' + (TYPE_CONST[info.type] || '[???]') +
+    ' (' + (TYPE_CONST[this.type] || '[???]') +
     ': ' + info.length + ')\n' +
     debugData(this.data, this, spacer + '  ');
 }
@@ -94,6 +95,7 @@ Chunk.prototype.parseData = function (buffer) {
     case TYPES.IA5:
     case TYPES.T61:
     case TYPES.UTF8:
+    case TYPES.PRINTABLE:
       return buffer.toString('utf8');
 
     case TYPES.OBJECT:
@@ -187,9 +189,11 @@ Chunk.prototype.setRawData = function (buffer) {
 Chunk.prototype.getRaw = function () {
   const data = this.serialize(this.data);
   const length = getDataLength(data);
+  // const type = this.type | this.typeClass;
+  const type = this.type;
 
   return Buffer.concat([
-    Buffer.from([this.type | this.typeClass]),
+    Buffer.from([type]),
     length.raw,
     data
   ], length.value + length.raw.length + 1);
