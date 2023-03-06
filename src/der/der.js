@@ -12,8 +12,6 @@ const {
 } = require('./utils.js');
 
 function Chunk (type, data) {
-  // this.type = type & 0b00111111;
-  // this.typeClass = type & 0b11000000;
   this.type = type;
   this.data = null;
 
@@ -174,8 +172,21 @@ Chunk.prototype.serialize = function (data) {
       }
   }
 }
+Chunk.prototype.convert = function (data) {
+  switch (this.type) {
+    case TYPES.OBJECT:
+      if (typeof data === 'string') {
+        return new OID(data);
+      }
+
+      return data;
+
+    default:
+      return data;
+  }
+}
 Chunk.prototype.set = function (data) {
-  this.data = data;
+  this.data = this.convert(data);
   this.raw = this.getRaw();
 
   return this;
@@ -189,7 +200,6 @@ Chunk.prototype.setRawData = function (buffer) {
 Chunk.prototype.getRaw = function () {
   const data = this.serialize(this.data);
   const length = getDataLength(data);
-  // const type = this.type | this.typeClass;
   const type = this.type;
 
   return Buffer.concat([
@@ -202,5 +212,6 @@ Chunk.prototype.getInfo = function () {
   return readChunkInfo(this.raw);
 }
 Chunk.TYPES = TYPES;
+Chunk.Null = new Chunk(TYPES.NULL, null);
 
 module.exports = { Chunk };

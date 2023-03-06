@@ -57,5 +57,10 @@ module.exports = {
     ]), { raw: '300d310302010c31060c0474657874' });
 
     resolve();
+  },
+  'Correctly sets object data as string': function (resolve) {
+    chunkCheck(this, new Chunk(Chunk.TYPES.OBJECT, '1.2.840.113549.1.1.1'), { raw: '06092a864886f70d010101' });
+
+    resolve();
   }
 };
