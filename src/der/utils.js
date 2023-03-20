@@ -3,16 +3,6 @@ const { OID } = require('../oid/oid.js');
 const { TYPES, TYPE_CONST } = require('./constants.js');
 const { Stack } = require('../common/stack.js');
 
-// DEPRECATED
-/*
-function debugType (chunk) {
-  return '[' +
-    chunk.typeByte.toString(16) +
-    '] ' +
-    TYPE_CONST[chunk.type];
-}
-*/
-
 function debugData (data, chunk, spacer = '') {
   const Chunk = chunk.constructor;
 
@@ -188,6 +178,12 @@ function getDataLength (data) {
   };
 }
 
+function chunkFactory (type) {
+  return function (data) {
+    return new this(type, data);
+  }
+}
+
 module.exports = {
   // debugType,
   debugData,
@@ -196,4 +192,5 @@ module.exports = {
   getBufferFromNumber,
   parseOID,
   readOID,
+  chunkFactory,
 };

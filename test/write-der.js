@@ -62,5 +62,18 @@ module.exports = {
     chunkCheck(this, new Chunk(Chunk.TYPES.OBJECT, '1.2.840.113549.1.1.1'), { raw: '06092a864886f70d010101' });
 
     resolve();
+  },
+  'Correctly create chunks from shortcut factories': function (resolve) {
+    chunkCheck(this, Chunk.Sequence([
+      Chunk.Set([Chunk.Null]),
+      Chunk.Set([Chunk.Null]),
+    ]), { raw: '30083102050031020500' });
+    chunkCheck(this, Chunk.Integer(0x10), { raw: '020110' });
+    chunkCheck(this, Chunk.Bit(getBuffer('aabbccddee')), { raw: '030600aabbccddee' });
+    chunkCheck(this, Chunk.Octet(getBuffer('aabbccddee')), { raw: '0405aabbccddee' });
+    chunkCheck(this, Chunk.Object('1.2.840.113549.1.1.1'), { raw: '06092a864886f70d010101' });
+    chunkCheck(this, Chunk.Utf8('Hello, World!'), { raw: '0c0d48656c6c6f2c20576f726c6421' });
+
+    resolve();
   }
 };

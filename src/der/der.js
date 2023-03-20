@@ -9,6 +9,7 @@ const {
   debugData,
   readChunkInfo,
   getBufferFromNumber,
+  chunkFactory,
 } = require('./utils.js');
 
 function Chunk (type, data) {
@@ -19,16 +20,6 @@ function Chunk (type, data) {
     this.set(data);
   }
 }
-/*
-Chunk.prototype.toJSON = function () {
-  return {
-    type: debugType(this),
-    data: this.data instanceof Buffer
-      ? '[' + this.data.toString('hex') + ']'
-      : this.data,
-  };
-}
-*/
 Chunk.prototype.toHEX = function (params) {
   return HEX(this.getRaw(), params);
 }
@@ -212,6 +203,18 @@ Chunk.prototype.getInfo = function () {
   return readChunkInfo(this.raw);
 }
 Chunk.TYPES = TYPES;
+
 Chunk.Null = new Chunk(TYPES.NULL, null);
+Chunk.Sequence = chunkFactory(TYPES.SEQUENCE);
+Chunk.Set = chunkFactory(TYPES.SET);
+Chunk.Integer = chunkFactory(TYPES.INTEGER);
+Chunk.Bit = chunkFactory(TYPES.BIT);
+Chunk.Octet = chunkFactory(TYPES.OCTET);
+Chunk.Object = chunkFactory(TYPES.OBJECT);
+Chunk.Utf8 = chunkFactory(TYPES.UTF8);
+Chunk.Printable = chunkFactory(TYPES.PRINTABLE);
+Chunk.T61 = chunkFactory(TYPES.T61);
+Chunk.Ia5 = chunkFactory(TYPES.IA5);
+Chunk.Time = chunkFactory(TYPES.TIME);
 
 module.exports = { Chunk };
